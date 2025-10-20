@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useEditor } from '../hooks/useEditor';
 import { FileTree } from '../components/editor/FileTree';
 import { Editor } from '../components/editor/Editor';
@@ -10,9 +10,10 @@ import { Link } from 'react-router-dom';
 import { Transition } from '@headlessui/react';
 
 const Sidebar = ({ editor, isOpen, onClose }) => (
-    <Transition show={isOpen}>
+    <Transition show={isOpen} as={Fragment}>
         <div className="fixed inset-0 z-40 flex">
             <Transition.Child
+                as={Fragment}
                 enter="transition-opacity ease-linear duration-300"
                 enterFrom="opacity-0"
                 enterTo="opacity-100"
@@ -24,7 +25,7 @@ const Sidebar = ({ editor, isOpen, onClose }) => (
             </Transition.Child>
 
             <Transition.Child
-                className="relative flex flex-col w-full max-w-xs bg-white h-full"
+                as={Fragment}
                 enter="transition ease-in-out duration-300 transform"
                 enterFrom="-translate-x-full"
                 enterTo="translate-x-0"
@@ -32,24 +33,26 @@ const Sidebar = ({ editor, isOpen, onClose }) => (
                 leaveFrom="translate-x-0"
                 leaveTo="-translate-x-full"
             >
-                <div className="p-4 border-b flex justify-between items-center">
-                    <h2 className="text-lg font-bold">GitMoon Editor</h2>
-                    <button onClick={onClose} className="p-1 rounded hover:bg-gray-200"><X size={20} /></button>
-                </div>
-                
-                <div className="p-4 space-y-4 border-b">
-                    <h3 className="font-bold">Configuration</h3>
-                    <input type="password" placeholder="GitHub Token" value={editor.token} onChange={(e) => editor.setToken(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
-                    <input type="text" placeholder="Repository (username/repo)" value={editor.repo} onChange={(e) => editor.setRepo(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
-                    <input type="text" placeholder="Branch" value={editor.branch} onChange={(e) => editor.setBranch(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
-                    <UnapologeticButton onClick={editor.handleFetchTree} disabled={editor.isLoadingTree} variant="secondary">
-                        {editor.isLoadingTree ? 'Scanning...' : 'Scan Repository'}
-                    </UnapologeticButton>
-                </div>
+                <div className="relative flex flex-col w-full max-w-xs bg-white h-full shadow-xl">
+                    <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
+                        <h2 className="text-lg font-bold">GitMoon Editor</h2>
+                        <button onClick={onClose} className="p-1 rounded hover:bg-gray-200"><X size={20} /></button>
+                    </div>
+                    
+                    <div className="p-4 space-y-4 border-b flex-shrink-0">
+                        <h3 className="font-bold">Configuration</h3>
+                        <input type="password" placeholder="GitHub Token" value={editor.token} onChange={(e) => editor.setToken(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
+                        <input type="text" placeholder="Repository (username/repo)" value={editor.repo} onChange={(e) => editor.setRepo(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
+                        <input type="text" placeholder="Branch" value={editor.branch} onChange={(e) => editor.setBranch(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
+                        <UnapologeticButton onClick={editor.handleFetchTree} disabled={editor.isLoadingTree} variant="secondary">
+                            {editor.isLoadingTree ? 'Scanning...' : 'Scan Repository'}
+                        </UnapologeticButton>
+                    </div>
 
-                <div className="flex-grow overflow-y-auto">
-                    <h3 className="p-4 font-bold">File Explorer</h3>
-                    <FileTree tree={editor.structuredTree} onFileSelect={editor.handleFileSelect} isLoading={editor.isLoadingTree} />
+                    <div className="flex-grow overflow-y-auto min-h-0">
+                        <h3 className="p-4 font-bold sticky top-0 bg-white z-10">File Explorer</h3>
+                        <FileTree tree={editor.structuredTree} onFileSelect={editor.handleFileSelect} isLoading={editor.isLoadingTree} />
+                    </div>
                 </div>
             </Transition.Child>
         </div>
