@@ -1,5 +1,6 @@
 import { OffsetShadowCard } from '../commit/Shared';
 
+// Define props interface for type safety and clarity
 interface ConfigSectionProps {
     repo: string;
     setRepo: (value: string) => void;
@@ -19,6 +20,12 @@ export const ConfigSection = (props: ConfigSectionProps) => {
         githubToken, setGithubToken, geminiKey, setGeminiKey
     } = props;
 
+    // FIX: Add an onBlur handler to auto-clean the repo input
+    const handleRepoBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        const cleanedValue = e.target.value.trim().replace(/^\/|\/$/g, '');
+        setRepo(cleanedValue);
+    };
+
     return (
         <OffsetShadowCard color="yellow" className="bg-yellow-200">
             <h2 className="text-xl font-bold mb-4 text-gray-800">Configuration</h2>
@@ -28,6 +35,7 @@ export const ConfigSection = (props: ConfigSectionProps) => {
                     placeholder="Repository (e.g., username/repo)"
                     value={repo}
                     onChange={(e) => setRepo(e.target.value)}
+                    onBlur={handleRepoBlur} // Auto-clean on focus out
                     className="w-full p-2 border-2 border-black rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 sm:col-span-2"
                 />
                 <input
