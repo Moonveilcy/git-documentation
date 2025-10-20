@@ -3,6 +3,7 @@ import { Toast } from '../components/commit/Toast';
 import { ConfigSection } from '../components/changelog/ConfigSection';
 import { OutputSection } from '../components/changelog/OutputSection';
 import { UnapologeticButton } from '../components/commit/Shared';
+import { GuideSection } from '../components/changelog/GuideSection';
 
 export default function ChangelogPage() {
     const changelog = useChangelogGenerator();
@@ -44,6 +45,10 @@ export default function ChangelogPage() {
                     generatedChangelog={changelog.generatedChangelog}
                     setNotification={changelog.setNotification}
                 />
+
+                <div className="mt-16">
+                    <GuideSection />
+                </div>
             </main>
         </div>
     );

@@ -9,7 +9,6 @@ interface OutputSectionProps {
 }
 
 export const OutputSection = ({ isLoading, generatedChangelog, setNotification }: OutputSectionProps) => {
-
     const handleCopy = () => {
         if (!generatedChangelog) return;
         navigator.clipboard.writeText(generatedChangelog)
