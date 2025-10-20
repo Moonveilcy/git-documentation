@@ -1,22 +1,21 @@
 import { useState, Fragment } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Menu, X, UploadCloud } from 'lucide-react';
+import { Menu, X, UploadCloud, FileText, GitCommit, FileCode, History } from 'lucide-react';
 import { Transition } from '@headlessui/react';
 import { HomeIcon } from './icons/HomeIcon';
-import { CommitIcon } from './icons/CommitIcon';
-import { ReadmeIcon } from './icons/ReadmeIcon';
-import { ChangelogIcon } from './icons/ChangelogIcon';
 import { DiscordIcon } from './icons/DiscordIcon';
+import { ChangelogIcon } from './icons/ChangelogIcon';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
   const navLinks = [
     { name: 'Home', path: '/', icon: HomeIcon },
-    { name: 'Commit & Push', path: '/commit', icon: CommitIcon },
-    { name: 'README Generator', path: '/readme', icon: ReadmeIcon },
-    { name: 'Changelog AI', path: '/changelog', icon: ChangelogIcon },
-    { name: 'Upload ZIP', path: '/upload-zip', icon: UploadCloud },
+    { name: 'Code Editor', path: '/editor', icon: FileCode },
+    { name: 'Quick Upload', path: '/commit', icon: UploadCloud },
+    { name: 'README Gen', path: '/readme', icon: FileText },
+    { name: 'Changelog Gen', path: '/changelog', icon: History },
+    { name: 'Deploy ZIP', path: '/upload-zip', icon: GitCommit },
     { name: 'Discord', path: 'https://discord.gg/your-invite', icon: DiscordIcon, external: true },
   ];
   

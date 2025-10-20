@@ -6,6 +6,7 @@ import CommitPage from './pages/CommitPage';
 import ReadmePage from './pages/ReadmePage';
 import UploadZipPage from './pages/UploadZipPage';
 import ChangelogPage from './pages/ChangelogPage';
+import EditorPage from './pages/EditorPage';
 
 export default function App() {
   return (
@@ -18,9 +19,10 @@ export default function App() {
           <Route path="/readme" element={<ReadmePage />} />
           <Route path="/upload-zip" element={<UploadZipPage />} />
           <Route path="/changelog" element={<ChangelogPage />} />
+          <Route path="/editor" element={<EditorPage />} />
         </Routes>
       </main>
-      <Footer />
+      { !window.location.pathname.includes('/editor') && <Footer /> }
     </div>
   );
 }
