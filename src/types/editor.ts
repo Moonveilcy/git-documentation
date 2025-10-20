@@ -7,5 +7,5 @@ export interface RepoTreeItem {
 export interface ActiveFile {
   path: string;
   content: string;
-  sha: string;
+  originalContent: string;
 }
