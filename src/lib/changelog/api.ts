@@ -6,12 +6,15 @@ const githubApiFetch = async (url: string, token: string, options: RequestInit =
         ...options,
         headers: {
             ...options.headers,
-            'Authorization': `Bearer ${token.trim()}`,
+            'Authorization': `token ${token.trim()}`,
             'Accept': 'application/vnd.github.v3+json',
         },
     });
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: `GitHub API Error: ${response.statusText}` }));
+        if (response.status === 401) {
+            throw new Error("Authentication failed. Please check if your GitHub token is correct and has the required permissions.");
+        }
         throw new Error(errorData.message || 'An unknown GitHub API error occurred.');
     }
     return response.json();
@@ -20,13 +23,16 @@ const githubApiFetch = async (url: string, token: string, options: RequestInit =
 export const getCommitsBetweenRefs = async (repo: string, base: string, head: string, token: string): Promise<ChangelogCommit[]> => {
     try {
         const data = await githubApiFetch(`/repos/${repo}/compare/${base}...${head}`, token);
+        if (!data.commits || data.commits.length === 0) {
+            return [];
+        }
         return data.commits.map((c: any) => ({
             message: c.commit.message,
             sha: c.sha
         }));
     } catch (error) {
         console.error("Failed to fetch commits:", error);
-        throw new Error("Could not fetch commits. Ensure the repo name and references are correct.");
+        throw new Error("Could not fetch commits. Ensure the repo name and references are correct and your token has 'repo' scope.");
     }
 };
 
