@@ -8,7 +8,9 @@ const buildFileTree = (paths: RepoTreeItem[]) => {
     paths.forEach(item => {
         let current = root;
         item.path.split('/').forEach(part => {
-            if (!current[part]) current[part] = {};
+            if (!current[part]) {
+                current[part] = {};
+            }
             current = current[part];
         });
         current.__isLeaf = true;
@@ -35,7 +37,9 @@ export const useEditor = () => {
 
     useEffect(() => {
         const storedToken = localStorage.getItem('githubToken');
-        if (storedToken) setToken(storedToken);
+        if (storedToken) {
+            setToken(storedToken);
+        }
     }, []);
 
     const handleFetchTree = useCallback(async () => {
@@ -63,8 +67,9 @@ export const useEditor = () => {
     }, [repo, branch, token]);
 
     const handleFileSelect = useCallback(async (path: string) => {
-        if (openFiles.some(f => f.path === path)) {
-            setActiveFilePath(path);
+        const existingFile = openFiles.find(f => f.path.toLowerCase() === path.toLowerCase());
+        if (existingFile) {
+            setActiveFilePath(existingFile.path);
             return;
         }
         try {

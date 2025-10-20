@@ -40,7 +40,6 @@ const TreeNode = ({ name, node, onFileSelect, path = '' }) => {
     );
 };
 
-
 interface FileTreeProps {
     tree: object;
     onFileSelect: (path: string) => void;
