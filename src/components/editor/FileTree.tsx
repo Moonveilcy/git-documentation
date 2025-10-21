@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { File, Folder, ChevronRight, ChevronDown } from 'lucide-react';
+import { File, Folder, ChevronRight, ChevronDown, MoreVertical } from 'lucide-react';
+import { useEditor } from '../../hooks/useEditor';
 
 const TreeNode = ({ name, node, onFileSelect, path = '' }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -7,27 +8,37 @@ const TreeNode = ({ name, node, onFileSelect, path = '' }) => {
 
     if (node.__isLeaf) {
         return (
-            <li>
+            <li className="group">
                 <button
                     onClick={() => onFileSelect(node.__itemData.path)}
-                    className="w-full text-left flex items-center gap-2 pl-4 pr-2 py-1.5 text-sm hover:bg-purple-100"
+                    className="w-full text-left flex items-center justify-between gap-2 pl-4 pr-2 py-1.5 text-sm hover:bg-purple-100"
                 >
-                    <File size={14} className="flex-shrink-0 text-gray-500" />
-                    <span className="truncate">{name}</span>
+                    <div className="flex items-center gap-2 truncate">
+                        <File size={14} className="flex-shrink-0 text-gray-500" />
+                        <span className="truncate">{name}</span>
+                    </div>
+                    <button className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-300">
+                         <MoreVertical size={14} />
+                    </button>
                 </button>
             </li>
         );
     }
 
     return (
-        <li>
+        <li className="group">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full text-left flex items-center gap-2 pl-4 pr-2 py-1.5 text-sm hover:bg-purple-100 font-semibold"
+                className="w-full text-left flex items-center justify-between gap-2 pl-4 pr-2 py-1.5 text-sm hover:bg-purple-100 font-semibold"
             >
-                {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                <Folder size={14} className="flex-shrink-0 text-yellow-600" />
-                <span>{name}</span>
+                 <div className="flex items-center gap-2 truncate">
+                    {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    <Folder size={14} className="flex-shrink-0 text-yellow-600" />
+                    <span>{name}</span>
+                </div>
+                 <button className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-300">
+                    <MoreVertical size={14} />
+                </button>
             </button>
             {isOpen && (
                 <ul className="pl-4 border-l border-gray-200">
@@ -62,7 +73,7 @@ export const FileTree = ({ tree, onFileSelect, isLoading }: FileTreeProps) => {
                     ))}
                 </ul>
             ) : (
-                <p className="p-4 text-sm text-gray-500">Scan a repository to see files.</p>
+                <p className="p-4 text-sm text-gray-500">Clone a repository to see files.</p>
             )}
         </>
     );
