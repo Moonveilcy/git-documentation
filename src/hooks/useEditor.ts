@@ -7,17 +7,24 @@ const buildFileTree = (paths: RepoTreeItem[], repoName: string) => {
     const root: any = { [repoName]: {} };
     paths.forEach(item => {
         let current = root[repoName];
-        item.path.split('/').forEach((part, index, arr) => {
-            if (!current[part]) current[part] = {};
+        const parts = item.path.split('/');
+        parts.forEach((part, index) => {
+            if (!current[part]) {
+                current[part] = {};
+            }
             current = current[part];
-            if (index === arr.length - 1) {
-                current.__isLeaf = true;
-                current.__itemData = item;
+
+            if (index === parts.length - 1) {
+                if (item.type === 'blob') {
+                    current.__isLeaf = true;
+                    current.__itemData = item;
+                }
             }
         });
     });
     return root;
 };
+
 
 export const useEditor = () => {
     const [token, setToken] = useState('');
@@ -91,7 +98,7 @@ export const useEditor = () => {
         setIsOpeningFile(path);
         try {
             const content = await editorApi.getFileContent(`${workspace.owner}/${workspace.repo}`, path, workspace.branch, token);
-            const newFile: ActiveFile = { path, content, originalContent: content };
+            const newFile: ActiveFile = { path, content: content ?? '', originalContent: content ?? '' };
             setOpenFiles(prev => [...prev, newFile]);
             setActiveFilePath(path);
         } catch (error) {

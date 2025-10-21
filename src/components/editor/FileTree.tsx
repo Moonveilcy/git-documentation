@@ -1,4 +1,4 @@
-import { useRef, useEffect, Fragment } from 'react';
+import { useRef, useEffect } from 'react';
 import { File, Folder, ChevronRight, ChevronDown, MoreVertical } from 'lucide-react';
 import { useEditor } from '../../hooks/useEditor';
 
@@ -18,18 +18,19 @@ const TreeNode = ({ name, node, editor, path = '' }: { name: string, node: any, 
                     className="flex-grow flex items-center gap-2 pl-4 py-1.5 truncate text-left"
                 >
                     {!isLeaf && (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
-                    {isLeaf ? <File size={14} className="flex-shrink-0 text-gray-500 ml-5" /> : <Folder size={14} className="flex-shrink-0 text-yellow-600" />}
+                    {isLeaf ? <File size={14} className="flex-shrink-0 text-gray-500" style={{ marginLeft: isRoot ? '0' : '1.25rem' }} /> : <Folder size={14} className="flex-shrink-0 text-yellow-600" />}
                     <span>{name}</span>
+                </button>
+                <button className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-300">
+                    <MoreVertical size={16} />
                 </button>
             </div>
             {!isLeaf && isOpen && (
                 <ul className="pl-4 border-l border-gray-200">
-                    {Object.entries(node).filter(([_, childNode]) => !(childNode as any).__isLeaf).sort(([a], [b]) => a.localeCompare(b)).map(([childName, childNode]) => (
-                        <TreeNode key={childName} name={childName} node={childNode} editor={editor} path={currentPath} />
-                    ))}
-                    {Object.entries(node).filter(([_, childNode]) => (childNode as any).__isLeaf).sort(([a], [b]) => a.localeCompare(b)).map(([childName, childNode]) => (
-                        <TreeNode key={childName} name={childName} node={childNode} editor={editor} path={currentPath} />
-                    ))}
+                    {Object.keys(node).sort().map(childName => {
+                        if (childName.startsWith('__')) return null;
+                        return <TreeNode key={childName} name={childName} node={node[childName]} editor={editor} path={currentPath} />
+                    })}
                 </ul>
             )}
         </li>
