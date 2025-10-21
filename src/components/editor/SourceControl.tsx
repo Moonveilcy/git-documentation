@@ -2,14 +2,36 @@ import { useState } from 'react';
 import { UnapologeticButton } from '../commit/Shared';
 import { useEditor } from '../../hooks/useEditor';
 
+const parseRepoInput = (input: string): string => {
+    try {
+        if (input.startsWith('http')) {
+            const url = new URL(input);
+            const pathParts = url.pathname.split('/').filter(part => part);
+            if (pathParts.length >= 2) {
+                return `${pathParts[0]}/${pathParts[1]}`;
+            }
+        }
+    } catch (e) { /* Invalid URL, treat as path */ }
+    return input.trim();
+};
+
 interface SourceControlProps {
     editor: ReturnType<typeof useEditor>;
 }
 
 export const SourceControl = ({ editor }: SourceControlProps) => {
-    const [repoToClone, setRepoToClone] = useState('Gaeuly/veilcy-cloner');
+    const [repoInput, setRepoInput] = useState('Gaeuly/veilcy-cloner');
     const [branchToClone, setBranchToClone] = useState('main');
     const [commitMessage, setCommitMessage] = useState('');
+
+    const handleClone = () => {
+        const repoPath = parseRepoInput(repoInput);
+        if (!repoPath.includes('/')) {
+            editor.setNotification({ message: 'Invalid repository format. Use URL or username/repo.', type: 'error' });
+            return;
+        }
+        editor.handleCloneRepo(repoPath, branchToClone);
+    };
 
     const handleCommit = () => {
         if (!commitMessage.trim()) {
@@ -25,9 +47,9 @@ export const SourceControl = ({ editor }: SourceControlProps) => {
             <div>
                 <h3 className="font-bold mb-2">Clone Repository</h3>
                 <div className="space-y-2">
-                    <input type="text" placeholder="username/repo" value={repoToClone} onChange={e => setRepoToClone(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
+                    <input type="text" placeholder="URL or username/repo" value={repoInput} onChange={e => setRepoInput(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
                     <input type="text" placeholder="branch" value={branchToClone} onChange={e => setBranchToClone(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
-                    <UnapologeticButton onClick={() => editor.handleCloneRepo(repoToClone, branchToClone)} disabled={editor.isLoading} variant="secondary">
+                    <UnapologeticButton onClick={handleClone} disabled={editor.isLoading} variant="secondary">
                         {editor.isLoading ? 'Cloning...' : 'Clone'}
                     </UnapologeticButton>
                 </div>
