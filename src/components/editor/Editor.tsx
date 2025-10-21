@@ -25,14 +25,15 @@ const getLanguageFromPath = (path: string): string => {
 
 interface EditorProps {
     activeFile: ActiveFile | null;
-    editedContent: string | null;
     onContentChange: (content: string) => void;
     isLoading: boolean;
 }
 
-export const Editor = ({ activeFile, editedContent, onContentChange, isLoading }: EditorProps) => {
+export const Editor = ({ activeFile, onContentChange, isLoading }: EditorProps) => {
     const editorRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const onContentChangeRef = useRef(onContentChange);
+    onContentChangeRef.current = onContentChange;
 
     useEffect(() => {
         const monaco = (window as any).monaco;
@@ -50,23 +51,28 @@ export const Editor = ({ activeFile, editedContent, onContentChange, isLoading }
                 });
             };
         }
-        return () => editorRef.current?.dispose();
+        return () => {
+            editorRef.current?.dispose();
+            editorRef.current = null;
+        }
     }, []);
     
     useEffect(() => {
         if (editorRef.current && activeFile) {
             const model = editorRef.current.getModel();
             const language = getLanguageFromPath(activeFile.path);
-            
-            if (editedContent !== model.getValue()) {
-                model.setValue(editedContent || '');
+
+            if (activeFile.content !== model.getValue()) {
+                model.setValue(activeFile.content);
             }
             
             if (model.getLanguageId() !== language) {
                 (window as any).monaco.editor.setModelLanguage(model, language);
             }
+        } else if (editorRef.current && !activeFile) {
+            editorRef.current.getModel()?.setValue('');
         }
-    }, [activeFile, editedContent]);
+    }, [activeFile]);
 
     const initializeMonaco = (monaco: any) => {
         if (containerRef.current && !editorRef.current) {
@@ -80,13 +86,15 @@ export const Editor = ({ activeFile, editedContent, onContentChange, isLoading }
             });
 
             editorRef.current = monaco.editor.create(containerRef.current, {
-                value: editedContent || '',
+                value: activeFile?.content || '',
                 language: activeFile ? getLanguageFromPath(activeFile.path) : 'plaintext',
                 theme: 'vs-dark',
                 automaticLayout: true,
             });
             editorRef.current.onDidChangeModelContent(() => {
-                onContentChange(editorRef.current.getValue());
+                if (activeFile) {
+                     onContentChangeRef.current(editorRef.current.getValue());
+                }
             });
         }
     };

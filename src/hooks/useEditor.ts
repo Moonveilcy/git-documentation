@@ -101,6 +101,11 @@ export const useEditor = () => {
     
     const handleSave = () => {
         if (!activeFilePath) return;
+
+        setOpenFiles(files => files.map(f => 
+            f.path === activeFilePath ? { ...f, originalContent: f.content } : f
+        ));
+
         setStagedFiles(prev => new Set(prev).add(activeFilePath));
         setNotification({ message: `${activeFilePath.split('/').pop()} saved locally.`, type: 'success' });
     };
@@ -124,7 +129,6 @@ export const useEditor = () => {
             setNotification({ message: `${filesToCommit.length} file(s) committed successfully!`, type: 'success' });
             
             setStagedFiles(new Set());
-            setOpenFiles(files => files.map(f => stagedFiles.has(f.path) ? { ...f, originalContent: f.content } : f));
 
         } catch (error) {
             setNotification({ message: (error as Error).message, type: 'error' });
