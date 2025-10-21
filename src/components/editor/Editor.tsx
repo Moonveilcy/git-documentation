@@ -31,7 +31,9 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
     const containerRef = useRef<HTMLDivElement>(null);
     const onContentChangeRef = useRef(onContentChange);
     onContentChangeRef.current = onContentChange;
-    
+    const activeFileRef = useRef(activeFile);
+    activeFileRef.current = activeFile;
+
     useEffect(() => {
         let isDisposed = false;
         const monaco = (window as any).monaco;
@@ -66,7 +68,10 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
         if (editorRef.current && activeFile) {
             const model = editorRef.current.getModel();
             if (model && activeFile.content !== model.getValue()) {
-                model.setValue(activeFile.content);
+                editorRef.current.executeEdits(null, [{
+                    range: model.getFullModelRange(),
+                    text: activeFile.content
+                }]);
             }
             if (model) {
                  const language = getLanguageFromPath(activeFile.path);
@@ -86,9 +91,10 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
                 minimap: { enabled: false },
             });
             editorRef.current.onDidChangeModelContent(() => {
+                const currentFile = activeFileRef.current;
                 const currentValue = editorRef.current?.getValue();
-                if (activeFile && currentValue !== activeFile.content) {
-                    onContentChangeRef.current(activeFile.path, currentValue || '');
+                if (currentFile && currentValue !== currentFile.content) {
+                    onContentChangeRef.current(currentFile.path, currentValue || '');
                 }
             });
         }
