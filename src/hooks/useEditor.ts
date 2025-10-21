@@ -32,14 +32,19 @@ export const useEditor = () => {
     const [isOpeningFile, setIsOpeningFile] = useState<string | null>(null);
     const [notification, setNotification] = useState<NotificationType | null>(null);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-    
-    // State baru untuk menyimpan konten file yang sudah dimodifikasi
     const [modifiedFiles, setModifiedFiles] = useState<Record<string, string>>({});
 
     useEffect(() => {
         const storedToken = localStorage.getItem('githubToken');
         if (storedToken) setToken(storedToken);
     }, []);
+
+    const refreshFileTree = () => {
+        if (workspace) {
+            const tree = buildFileTree(workspace.tree, workspace.repo);
+            setStructuredTree(tree);
+        }
+    };
 
     const toggleFolder = (path: string) => {
         setExpandedFolders(prev => {
@@ -58,7 +63,7 @@ export const useEditor = () => {
         setActiveFilePath(null);
         setStagedFiles(new Set());
         setExpandedFolders(new Set());
-        setModifiedFiles({}); // Reset cache saat clone repo baru
+        setModifiedFiles({});
 
         try {
             const data = await editorApi.scanRepoTree(repoPath, branchName, token);
@@ -87,17 +92,16 @@ export const useEditor = () => {
         if (!workspace) return;
         setIsOpeningFile(path);
         try {
-            // PERIKSA DULU: Apakah file ini ada di cache modifikasi kita?
             const modifiedContent = modifiedFiles[path];
             let content: string;
             let originalContent: string;
 
             if (modifiedContent !== undefined) {
-                // Jika ya, gunakan konten dari cache
                 content = modifiedContent;
-                originalContent = modifiedContent;
+                const originalFile = workspace.tree.find(f => f.path === path);
+                originalContent = originalFile ? await editorApi.getFileContent(`${workspace.owner}/${workspace.repo}`, path, workspace.branch, token) : content;
+
             } else {
-                // Jika tidak, baru ambil dari GitHub
                 const fetchedContent = await editorApi.getFileContent(`${workspace.owner}/${workspace.repo}`, path, workspace.branch, token);
                 content = fetchedContent ?? '';
                 originalContent = fetchedContent ?? '';
@@ -129,20 +133,9 @@ export const useEditor = () => {
         if (!activeFilePath) return;
         const currentFile = openFiles.find(f => f.path === activeFilePath);
         if (currentFile && currentFile.content !== currentFile.originalContent) {
-            // 1. Simpan perubahan ke cache modifikasi
-            setModifiedFiles(prev => ({
-                ...prev,
-                [activeFilePath]: currentFile.content
-            }));
-            
-            // 2. Tandai sebagai siap di-commit (staged)
+            setModifiedFiles(prev => ({ ...prev, [activeFilePath]: currentFile.content }));
             setStagedFiles(prev => new Set(prev).add(activeFilePath));
-            
-            // 3. Update 'originalContent' agar dot modifikasi hilang
-            setOpenFiles(files => files.map(f => 
-                f.path === activeFilePath ? { ...f, originalContent: f.content, isNew: false } : f
-            ));
-            
+            setOpenFiles(files => files.map(f => f.path === activeFilePath ? { ...f, originalContent: f.content, isNew: false } : f));
             setNotification({ message: `${activeFilePath.split('/').pop()} saved in session.`, type: 'success' });
         }
     };
@@ -151,38 +144,120 @@ export const useEditor = () => {
         if (!workspace || stagedFiles.size === 0) return;
         setIsLoading(true);
         try {
-            const filesToCommit = Array.from(stagedFiles).map(path => {
-                const file = openFiles.find(f => f.path === path);
-                // Ambil dari modifiedFiles jika tab sudah ditutup
-                const content = file?.content ?? modifiedFiles[path]; 
-                return { path, content };
-            });
+            const filesToCommit = Array.from(stagedFiles).map(path => ({
+                path,
+                content: modifiedFiles[path] ?? null
+            }));
             
             await editorApi.commitFiles(`${workspace.owner}/${workspace.repo}`, workspace.branch, token, filesToCommit, commitMessage);
             
-            // Hapus file yang sudah di-commit dari cache modifikasi
             setModifiedFiles(prev => {
                 const next = { ...prev };
-                stagedFiles.forEach(path => {
-                    delete next[path];
-                });
+                stagedFiles.forEach(path => delete next[path]);
                 return next;
             });
-            
-            setOpenFiles(prev => prev.map(f => stagedFiles.has(f.path) ? { ...f, originalContent: f.content } : f));
-            setStagedFiles(new Set());
+
+            // Refresh the entire workspace state from GitHub to reflect changes
+            await handleCloneRepo(`${workspace.owner}/${workspace.repo}`, workspace.branch);
+
             setNotification({ message: `${filesToCommit.length} file(s) committed.`, type: 'success' });
         } catch (error) {
             setNotification({ message: (error as Error).message, type: 'error' });
         } finally {
             setIsLoading(false);
         }
-    }, [workspace, token, openFiles, stagedFiles, modifiedFiles]);
+    }, [workspace, token, stagedFiles, modifiedFiles, handleCloneRepo]);
+
+    const handleCreateNode = (basePath: string, type: 'file' | 'folder') => {
+        const name = prompt(`Enter new ${type} name:`);
+        if (!name || !workspace) return;
+
+        const newPath = type === 'folder' 
+            ? `${basePath}/${name}/.gitkeep` 
+            : `${basePath}/${name}`;
+        
+        const content = '';
+
+        setModifiedFiles(prev => ({...prev, [newPath]: content}));
+        setStagedFiles(prev => new Set(prev).add(newPath));
+        
+        const newItem: RepoTreeItem = { path: newPath, type: 'blob', sha: '', url: '' };
+        setWorkspace(ws => ws ? { ...ws, tree: [...ws.tree, newItem] } : null);
+        
+        refreshFileTree();
+
+        if(type === 'file') {
+            const newFile: ActiveFile = { path: newPath, content, originalContent: '', isNew: true };
+            setOpenFiles(prev => [...prev, newFile]);
+            setActiveFilePath(newPath);
+        }
+        setNotification({ message: `New ${type} created. Commit to save.`, type: 'info' });
+    };
+
+    const handleRenameNode = (oldPath: string) => {
+        const newName = prompt(`Enter new name for ${oldPath.split('/').pop()}:`);
+        if (!newName || !workspace) return;
+
+        const newPath = oldPath.substring(0, oldPath.lastIndexOf('/') + 1) + newName;
+        const content = modifiedFiles[oldPath] ?? openFiles.find(f => f.path === oldPath)?.content;
+        
+        if (content === undefined) {
+            setNotification({ message: "Cannot rename file that is not open or modified.", type: 'error' });
+            return;
+        }
+
+        // Stage old file for deletion and new file for creation
+        setModifiedFiles(prev => ({ ...prev, [oldPath]: null, [newPath]: content }));
+        setStagedFiles(prev => new Set(prev).add(oldPath).add(newPath));
+        
+        // Update workspace tree
+        setWorkspace(ws => ws ? {
+            ...ws,
+            tree: ws.tree.filter(item => item.path !== oldPath).concat([{ path: newPath, type: 'blob', sha: '', url: '' }])
+        } : null);
+        
+        refreshFileTree();
+        
+        // Update open files
+        setOpenFiles(files => files.map(f => f.path === oldPath ? { ...f, path: newPath } : f));
+        if (activeFilePath === oldPath) setActiveFilePath(newPath);
+
+        setNotification({ message: `Renamed to ${newName}. Commit to save.`, type: 'info' });
+    };
+
+    const handleDeleteNode = (path: string) => {
+        if (!confirm(`Are you sure you want to delete ${path}? This cannot be undone locally.`)) return;
+
+        setModifiedFiles(prev => ({ ...prev, [path]: null }));
+        setStagedFiles(prev => new Set(prev).add(path));
+        
+        setWorkspace(ws => ws ? { ...ws, tree: ws.tree.filter(item => item.path !== path) } : null);
+        refreshFileTree();
+        
+        handleCloseFile(path);
+        setNotification({ message: `${path} deleted. Commit to save.`, type: 'info' });
+    };
     
-    // ... (sisa fungsi tidak berubah)
-    const handleCreateNode = (path: string, type: 'file' | 'folder') => { setNotification({ message: `Create ${type} is not yet implemented.`, type: 'error' }); };
-    const handleRenameNode = (path: string) => { setNotification({ message: `Rename is not yet implemented.`, type: 'error' }); };
-    const handleDeleteNode = (path: string) => { setNotification({ message: `Delete is not yet implemented.`, type: 'error' }); };
+    const handleDownloadFile = async (path: string) => {
+        if (!workspace) return;
+        try {
+            let content = modifiedFiles[path] ?? openFiles.find(f => f.path === path)?.content;
+            if (content === undefined) {
+                 content = await editorApi.getFileContent(`${workspace.owner}/${workspace.repo}`, path, workspace.branch, token);
+            }
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = path.split('/').pop() || 'download';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch(error) {
+            setNotification({ message: `Failed to download file: ${(error as Error).message}`, type: 'error' });
+        }
+    };
 
     const activeFile = openFiles.find(f => f.path === activeFilePath);
 
@@ -190,6 +265,6 @@ export const useEditor = () => {
         token, setToken, workspace, structuredTree, openFiles, activeFile, stagedFiles, sidebarMode, setSidebarMode,
         isLoading, isOpeningFile, notification, setNotification, expandedFolders,
         handleCloneRepo, handleFileSelect, handleContentChange, handleCloseFile, handleSave, handleCommit, setActiveFilePath, toggleFolder,
-        handleCreateNode, handleRenameNode, handleDeleteNode
+        handleCreateNode, handleRenameNode, handleDeleteNode, handleDownloadFile
     };
 };

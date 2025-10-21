@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { File, Folder, ChevronRight, ChevronDown, MoreVertical, FilePlus, FolderPlus, Edit3, Trash2 } from 'lucide-react';
+import { File, Folder, ChevronRight, ChevronDown, MoreVertical, FilePlus, FolderPlus, Edit3, Trash2, Download } from 'lucide-react';
 import { useEditor } from '../../hooks/useEditor';
 
 const ActionMenu = ({ isVisible, isFolder, actions }) => {
@@ -11,7 +11,11 @@ const ActionMenu = ({ isVisible, isFolder, actions }) => {
                     <>
                         <li><button onClick={actions.onNewFile} className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"><FilePlus size={14} /> New File</button></li>
                         <li><button onClick={actions.onNewFolder} className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"><FolderPlus size={14} /> New Folder</button></li>
+                        <hr className="my-1" />
                     </>
+                )}
+                {!isFolder && (
+                     <li><button onClick={actions.onDownload} className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"><Download size={14} /> Download</button></li>
                 )}
                 <li><button onClick={actions.onRename} className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"><Edit3 size={14} /> Rename</button></li>
                 <li><button onClick={actions.onDelete} className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 text-red-600"><Trash2 size={14} /> Delete</button></li>
@@ -38,15 +42,17 @@ const TreeNode = ({ name, node, editor, path = '' }: { name: string, node: any, 
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [menuRef]);
     
-    const handleAction = (actionType: 'newFile' | 'newFolder' | 'rename' | 'delete') => (e: React.MouseEvent) => {
+    const handleAction = (actionType: 'newFile' | 'newFolder' | 'rename' | 'delete' | 'download') => (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsMenuOpen(false);
-        const targetPath = isLeaf ? path : currentPath; 
+        const targetPathForFolderAction = isLeaf ? path : currentPath; 
+        
         switch(actionType) {
-            case 'newFile': editor.handleCreateNode(targetPath, 'file'); break;
-            case 'newFolder': editor.handleCreateNode(targetPath, 'folder'); break;
+            case 'newFile': editor.handleCreateNode(targetPathForFolderAction, 'file'); break;
+            case 'newFolder': editor.handleCreateNode(targetPathForFolderAction, 'folder'); break;
             case 'rename': editor.handleRenameNode(currentPath); break;
             case 'delete': editor.handleDeleteNode(currentPath); break;
+            case 'download': editor.handleDownloadFile(currentPath); break;
         }
     };
 
@@ -73,6 +79,7 @@ const TreeNode = ({ name, node, editor, path = '' }: { name: string, node: any, 
                             onNewFolder: handleAction('newFolder'),
                             onRename: handleAction('rename'),
                             onDelete: handleAction('delete'),
+                            onDownload: handleAction('download'),
                         }}
                     />
                 </div>
