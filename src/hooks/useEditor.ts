@@ -1,71 +1,60 @@
 import { useState, useCallback, useEffect } from 'react';
-import * as githubApi from '../lib/githubApi';
+import * as editorApi from '../lib/editor/api';
 import { NotificationType } from './useGithub';
-import { RepoTreeItem, ActiveFile, Workspace, SidebarMode } from '../types/editor';
+import { RepoTreeItem, ActiveFile, Workspace } from '../types/editor';
 
-const buildFileTree = (paths: RepoTreeItem[], rootFolderName: string) => {
-    const root: any = { [rootFolderName]: {} };
+const buildFileTree = (paths: RepoTreeItem[], repoName: string) => {
+    const root = { [repoName]: {} };
     paths.forEach(item => {
-        let current = root[rootFolderName];
-        item.path.split('/').forEach(part => {
-            if (!current[part]) {
-                current[part] = {};
-            }
+        let current = root[repoName];
+        item.path.split('/').forEach((part, index, arr) => {
+            if (!current[part]) current[part] = {};
             current = current[part];
+            if (index === arr.length - 1) {
+                current.__isLeaf = true;
+                current.__itemData = item;
+            }
         });
-        current.__isLeaf = true;
-        current.__itemData = item;
     });
     return root;
 };
 
 export const useEditor = () => {
-    const [token, setToken] = useState<string>('');
-    const [sidebarMode, setSidebarMode] = useState<SidebarMode>('git');
-    
+    const [token, setToken] = useState('');
     const [workspace, setWorkspace] = useState<Workspace | null>(null);
     const [structuredTree, setStructuredTree] = useState({});
-
-    const [openFiles, setOpenFiles] = useState<ActiveFile[]>([]);
-    const [activeFilePath, setActiveFilePath] = useState<string | null>(null);
+    const [openFiles, setOpenFiles] = useState<ActiveFile[]>([]); 
+    const [activeFilePath, setActiveFilePath] = useState<string | null>(null); 
     const [stagedFiles, setStagedFiles] = useState<Set<string>>(new Set());
-    
+    const [sidebarMode, setSidebarMode] = useState<'files' | 'git'>('git');
     const [isLoading, setIsLoading] = useState(false);
+    const [isOpeningFile, setIsOpeningFile] = useState<string | null>(null);
     const [notification, setNotification] = useState<NotificationType | null>(null);
-    
+
     useEffect(() => {
         const storedToken = localStorage.getItem('githubToken');
         if (storedToken) setToken(storedToken);
     }, []);
 
-    const resetWorkspace = () => {
-        setWorkspace(null);
-        setStructuredTree({});
-        setOpenFiles([]);
-        setActiveFilePath(null);
-        setStagedFiles(new Set());
+    const updateWorkspaceTree = (newTree: RepoTreeItem[]) => {
+        if (!workspace) return;
+        const newWorkspace = { ...workspace, tree: newTree };
+        setWorkspace(newWorkspace);
+        setStructuredTree(buildFileTree(newTree, newWorkspace.repo));
     };
 
     const handleCloneRepo = useCallback(async (repoPath: string, branchName: string) => {
-        if (!repoPath) {
-            setNotification({ message: 'Repository path is required.', type: 'error' });
-            return;
-        }
         setIsLoading(true);
-        resetWorkspace();
+        setNotification(null);
         try {
+            const data = await editorApi.scanRepoTree(repoPath, branchName, token);
             const [owner, repo] = repoPath.split('/');
-            const data = await githubApi.scanRepoTree(repoPath, branchName, token);
-            const filesOnly = data.tree.filter((item: any) => item.type === 'blob');
-            
             const newWorkspace: Workspace = {
-                owner, repo, branch: branchName, isCloned: true, tree: filesOnly
+                owner, repo, branch: branchName, isCloned: true, tree: data.tree
             };
-
             setWorkspace(newWorkspace);
-            setStructuredTree(buildFileTree(filesOnly, repo));
+            setStructuredTree(buildFileTree(data.tree, repo));
             setSidebarMode('files');
-            setNotification({ message: `Repository ${repoPath} cloned successfully.`, type: 'success' });
         } catch (error) {
             setNotification({ message: (error as Error).message, type: 'error' });
         } finally {
@@ -74,86 +63,107 @@ export const useEditor = () => {
     }, [token]);
 
     const handleFileSelect = useCallback(async (path: string) => {
-        if (!workspace) return;
-        
-        const existingFile = openFiles.find(f => f.path.toLowerCase() === path.toLowerCase());
-        if (existingFile) {
-            setActiveFilePath(existingFile.path);
+        if (openFiles.some(f => f.path === path)) {
+            setActiveFilePath(path);
             return;
         }
-
-        setIsLoading(true);
+        if (!workspace) return;
+        setIsOpeningFile(path);
         try {
-            const content = await githubApi.getFileContent(`${workspace.owner}/${workspace.repo}`, path, workspace.branch, token);
+            const content = await editorApi.getFileContent(`${workspace.owner}/${workspace.repo}`, path, workspace.branch, token);
             const newFile: ActiveFile = { path, content, originalContent: content };
             setOpenFiles(prev => [...prev, newFile]);
             setActiveFilePath(path);
         } catch (error) {
             setNotification({ message: `Failed to open ${path}: ${(error as Error).message}`, type: 'error' });
         } finally {
-            setIsLoading(false);
+            setIsOpeningFile(null);
         }
     }, [workspace, token, openFiles]);
-
+    
     const handleContentChange = (path: string, newContent: string) => {
         setOpenFiles(files => files.map(f => f.path === path ? { ...f, content: newContent } : f));
     };
 
+    const handleCloseFile = (path: string) => {
+        setOpenFiles(files => files.filter(f => f.path !== path));
+        setStagedFiles(prev => { const next = new Set(prev); next.delete(path); return next; });
+        if (activeFilePath === path) {
+            const remaining = openFiles.filter(f => f.path !== path);
+            setActiveFilePath(remaining.length > 0 ? remaining[remaining.length - 1].path : null);
+        }
+    };
+    
     const handleSave = () => {
         if (!activeFilePath) return;
-        setOpenFiles(files => files.map(f => f.path === activeFilePath ? { ...f, originalContent: f.content } : f));
-        setStagedFiles(prev => new Set(prev).add(activeFilePath));
-        setNotification({ message: `${activeFilePath.split('/').pop()} saved locally.`, type: 'success' });
+        const currentFile = openFiles.find(f => f.path === activeFilePath);
+        if (currentFile && currentFile.content !== currentFile.originalContent) {
+            setOpenFiles(files => files.map(f => f.path === activeFilePath ? { ...f, originalContent: f.content } : f));
+            setStagedFiles(prev => new Set(prev).add(activeFilePath));
+            setNotification({ message: `${activeFilePath.split('/').pop()} saved locally.`, type: 'success' });
+        }
     };
 
     const handleCommit = useCallback(async (commitMessage: string) => {
         if (!workspace || stagedFiles.size === 0) return;
-
         setIsLoading(true);
         try {
-            const filesToCommit = openFiles.filter(f => stagedFiles.has(f.path));
-            const githubFiles = filesToCommit.map(f => ({
-                name: f.path.split('/').pop() || '',
-                path: f.path,
-                content: f.content,
-                commitType: 'feat', 
-                commitMessage
-            }));
+            const filesToCommit = openFiles
+                .filter(f => stagedFiles.has(f.path))
+                .map(f => ({ path: f.path, content: f.content }));
             
-            await githubApi.commitMultipleFiles(`${workspace.owner}/${workspace.repo}`, workspace.branch, token, githubFiles);
+            await editorApi.commitFiles(`${workspace.owner}/${workspace.repo}`, workspace.branch, token, filesToCommit, commitMessage);
             setNotification({ message: `${filesToCommit.length} file(s) committed successfully!`, type: 'success' });
             setStagedFiles(new Set());
-
         } catch (error) {
             setNotification({ message: (error as Error).message, type: 'error' });
         } finally {
             setIsLoading(false);
         }
     }, [workspace, token, openFiles, stagedFiles]);
-    
+
+    const handleCreateNode = (path: string, type: 'file' | 'folder') => {
+        if (!workspace) return;
+        const name = prompt(`Enter name for new ${type}:`);
+        if (!name) return;
+        const newPath = path ? `${path}/${name}` : name;
+        if (type === 'folder' && !newPath.endsWith('/')) {
+            // Folders are just paths, we create a placeholder file to represent them
+            handleCreateNode(newPath, 'file');
+            return;
+        }
+        const newFile: ActiveFile = { path: newPath, content: '', originalContent: '', isNew: true };
+        setOpenFiles(prev => [...prev, newFile]);
+        setActiveFilePath(newPath);
+        updateWorkspaceTree([...workspace.tree, { path: newPath, type: 'blob', sha: '', url: '' }]);
+    };
+
+    const handleRenameNode = (oldPath: string) => {
+        // Implementasi rename butuh commit hapus + buat, cukup kompleks.
+        setNotification({ message: 'Rename is not yet implemented.', type: 'error'});
+    };
+
+    const handleDeleteNode = (path: string) => {
+         if (!workspace || !confirm(`Delete ${path}? This requires a direct commit.`)) return;
+         setIsLoading(true);
+         editorApi.commitFiles(
+             `${workspace.owner}/${workspace.repo}`, workspace.branch, token,
+             [{ path, content: null }],
+             `chore: delete ${path}`
+         ).then(() => {
+             setNotification({ message: `${path} deleted.`, type: 'success' });
+             updateWorkspaceTree(workspace.tree.filter(f => f.path !== path));
+             handleCloseFile(path);
+         }).catch(err => setNotification({ message: (err as Error).message, type: 'error' }))
+         .finally(() => setIsLoading(false));
+    };
+
     const activeFile = openFiles.find(f => f.path === activeFilePath);
 
     return {
-        token, setToken,
-        sidebarMode, setSidebarMode,
-        workspace,
-        structuredTree,
-        openFiles, activeFile,
-        stagedFiles,
-        isLoading,
-        notification, setNotification,
-        handleCloneRepo,
-        handleFileSelect,
-        handleContentChange,
-        handleSave,
-        handleCommit,
-        setActiveFilePath,
-        handleCloseFile: (path: string) => {
-            setOpenFiles(files => files.filter(f => f.path !== path));
-            if (activeFilePath === path) {
-                const remaining = openFiles.filter(f => f.path !== path);
-                setActiveFilePath(remaining.length > 0 ? remaining[0].path : null);
-            }
-        },
+        token, setToken, workspace, structuredTree, openFiles, activeFile, stagedFiles, sidebarMode, setSidebarMode,
+        isLoading, isOpeningFile, notification, setNotification,
+        handleCloneRepo, handleFileSelect, handleContentChange, handleCloseFile, handleSave, handleCommit, setActiveFilePath,
+        handleCreateNode, handleRenameNode, handleDeleteNode
     };
 };
