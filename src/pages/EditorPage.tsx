@@ -18,7 +18,7 @@ export default function EditorPage() {
     const isModified = activeFile ? activeFile.content !== activeFile.originalContent : false;
 
     return (
-        <div className="h-screen w-screen bg-gray-800 flex overflow-hidden">
+        <div className="h-screen w-screen bg-gray-800 flex flex-col overflow-hidden">
             {editor.notification && (
                 <Toast 
                     message={editor.notification.message} 
@@ -27,7 +27,8 @@ export default function EditorPage() {
                 />
             )}
             
-            <Transition show={sidebarOpen} as={Fragment}>
+            {/* Mobile Sidebar */}
+            <Transition show={sidebarOpen && window.innerWidth < 768} as={Fragment}>
                 <div className="fixed inset-0 z-40 flex md:hidden">
                     <Transition.Child as={Fragment} enter="transition-opacity ease-linear duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="transition-opacity ease-linear duration-300" leaveFrom="opacity-100" leaveTo="opacity-0">
                         <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
@@ -38,33 +39,36 @@ export default function EditorPage() {
                     </Transition.Child>
                 </div>
             </Transition>
-            
-            <aside className="hidden md:flex md:w-80 lg:w-96 flex-shrink-0 h-full">
-                 <Sidebar editor={editor} />
-            </aside>
-            
-            <div className="flex-grow flex flex-col min-w-0">
-                <header className="bg-gray-900 flex items-center justify-between p-2 flex-shrink-0 text-white">
-                    <button onClick={() => setSidebarOpen(true)} className="p-2 rounded hover:bg-gray-700 md:hidden">
-                        <Menu size={20} />
-                    </button>
-                    <div className="flex-grow text-center text-sm font-semibold truncate px-2">
-                        {editor.workspace ? `${editor.workspace.owner}/${editor.workspace.repo}` : "GitMoon Code Editor"}
-                    </div>
-                    {activeFile && (
-                        <UnapologeticButton onClick={editor.handleSave} disabled={!isModified} variant="primary" className="w-auto">
-                            <div className="flex items-center justify-center gap-2 px-2">
-                                <Save size={16} />
-                                <span>Save</span>
-                            </div>
-                        </UnapologeticButton>
-                    )}
-                     <Link to="/" className="p-2 rounded hover:bg-gray-700 ml-2" aria-label="Go Home">
-                        <Home size={20} />
-                    </Link>
-                </header>
 
-                <main className="flex-grow flex flex-col min-h-0">
+            {/* Header */}
+            <header className="bg-gray-900 flex items-center justify-between p-2 flex-shrink-0 text-white z-20">
+                <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded hover:bg-gray-700">
+                    <Menu size={20} />
+                </button>
+                <div className="flex-grow text-center text-sm font-semibold truncate px-2">
+                    {editor.workspace ? `${editor.workspace.owner}/${editor.workspace.repo}` : "GitMoon Code Editor"}
+                </div>
+                {activeFile && (
+                    <UnapologeticButton onClick={editor.handleSave} disabled={!isModified} variant="primary" className="w-auto">
+                        <div className="flex items-center justify-center gap-2 px-2">
+                            <Save size={16} />
+                            <span>Save</span>
+                        </div>
+                    </UnapologeticButton>
+                )}
+                 <Link to="/" className="p-2 rounded hover:bg-gray-700 ml-2" aria-label="Go Home">
+                    <Home size={20} />
+                </Link>
+            </header>
+            
+            <div className="flex flex-grow min-h-0">
+                {/* Desktop Sidebar */}
+                <aside className={`hidden md:flex flex-shrink-0 h-full transition-all duration-300 ${sidebarOpen ? 'w-80 lg:w-96' : 'w-0'}`}>
+                     <Sidebar editor={editor} />
+                </aside>
+                
+                {/* Main Content */}
+                <main className="flex-grow flex flex-col min-w-0">
                     <EditorTabs
                         openFiles={editor.openFiles}
                         activeFilePath={editor.activeFile?.path || null}
@@ -84,5 +88,3 @@ export default function EditorPage() {
         </div>
     );
 }
-
-
