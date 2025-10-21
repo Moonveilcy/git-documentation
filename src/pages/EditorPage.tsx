@@ -1,4 +1,4 @@
-import { useState, Fragment, useCallback } from 'react';
+import { useState, Fragment } from 'react';
 import { useEditor } from '../hooks/useEditor';
 import { Editor } from '../components/editor/Editor';
 import { EditorTabs } from '../components/editor/EditorTabs';
@@ -16,12 +16,6 @@ export default function EditorPage() {
 
     const activeFile = editor.activeFile;
     const isModified = activeFile ? activeFile.content !== activeFile.originalContent : false;
-
-    const onContentChange = useCallback((content: string) => {
-        if (activeFile) {
-            editor.handleContentChange(activeFile.path, content);
-        }
-    }, [activeFile, editor.handleContentChange]);
 
     return (
         <div className="h-screen w-screen bg-gray-800 flex overflow-hidden">
@@ -81,7 +75,7 @@ export default function EditorPage() {
                     <div className="flex-grow relative">
                         <Editor 
                             activeFile={activeFile}
-                            onContentChange={onContentChange}
+                            onContentChange={editor.handleContentChange}
                             isOpeningFile={editor.isOpeningFile}
                         />
                     </div>
@@ -90,3 +84,5 @@ export default function EditorPage() {
         </div>
     );
 }
+
+

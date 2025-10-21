@@ -22,7 +22,7 @@ const getLanguageFromPath = (path: string): string => {
 
 interface EditorProps {
     activeFile: ActiveFile | undefined;
-    onContentChange: (content: string) => void;
+    onContentChange: (path: string, content: string) => void;
     isOpeningFile: string | null;
 }
 
@@ -31,9 +31,12 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
     const containerRef = useRef<HTMLDivElement>(null);
     const [isEditorReady, setIsEditorReady] = useState(false);
     const subscriptionRef = useRef<IDisposable | null>(null);
-
+    
     const onContentChangeRef = useRef(onContentChange);
     onContentChangeRef.current = onContentChange;
+
+    const activeFileRef = useRef(activeFile);
+    activeFileRef.current = activeFile;
 
     useEffect(() => {
         let isDisposed = false;
@@ -58,12 +61,12 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
                 if (document.getElementById('monaco-loader-script')) return;
                 const script = document.createElement('script');
                 script.id = 'monaco-loader-script';
-                script.src = 'https://cdn.jsdelivr.net/npm/monaco-editor@latest/min/vs/loader.js';
+                script.src = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs/loader.js';
                 document.body.appendChild(script);
                 script.onload = () => {
                     if (isDisposed) return;
                     const require = (window as any).require;
-                    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@latest/min/vs' }});
+                    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs' }});
                     require(['vs/editor/editor.main'], (monacoInstance: any) => {
                         (window as any).monaco = monacoInstance;
                         if (!isDisposed) initializeMonaco(monacoInstance);
@@ -76,6 +79,7 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
 
         return () => {
             isDisposed = true;
+            subscriptionRef.current?.dispose();
             editorRef.current?.dispose();
             (window as any).monaco?.editor.getModels().forEach((model: any) => model.dispose());
             editorRef.current = null;
@@ -98,7 +102,10 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
             }
             
             if (model.getValue() !== activeFile.content) {
-                 model.setValue(activeFile.content);
+                 model.pushEditOperations([], [{
+                    range: model.getFullModelRange(),
+                    text: activeFile.content
+                 }], () => null);
             }
 
             if (editorRef.current.getModel() !== model) {
@@ -107,8 +114,9 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
 
             subscriptionRef.current = editorRef.current.onDidChangeModelContent(() => {
                 const currentValue = editorRef.current?.getModel()?.getValue();
-                if (currentValue !== undefined) {
-                    onContentChangeRef.current(currentValue);
+                const currentFile = activeFileRef.current;
+                if (currentFile && currentValue !== undefined && currentValue !== currentFile.content) {
+                    onContentChangeRef.current(currentFile.path, currentValue);
                 }
             });
         } else {
@@ -122,15 +130,15 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
     return (
         <div className="h-full w-full relative bg-[#1e1e1e]">
             {showOverlay && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-[#1e1e1e]">
+                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-[#1e1e1e]">
                     <span className="text-gray-400 text-lg animate-pulse">
-                        {isOpeningFile ? `Opening ${isOpeningFile.split('/').pop()}...` : 'Select a file to start editing'}
+                        {isOpeningFile ? `Opening ${isOpeningFile.split('/').pop()}...` : 'Select a file or clone a repository'}
                     </span>
                 </div>
             )}
             <div
                 ref={containerRef}
-                className={`h-full w-full transition-opacity duration-200 ${showOverlay ? 'opacity-0' : 'opacity-100'}`}
+                className={`h-full w-full ${showOverlay ? 'opacity-0' : 'opacity-100'}`}
             />
         </div>
     );
