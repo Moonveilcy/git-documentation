@@ -36,13 +36,6 @@ export const useEditor = () => {
         if (storedToken) setToken(storedToken);
     }, []);
 
-    const updateWorkspaceTree = (newTree: RepoTreeItem[]) => {
-        if (!workspace) return;
-        const newWorkspace = { ...workspace, tree: newTree };
-        setWorkspace(newWorkspace);
-        setStructuredTree(buildFileTree(newTree, newWorkspace.repo));
-    };
-
     const handleCloneRepo = useCallback(async (repoPath: string, branchName: string) => {
         setIsLoading(true);
         setNotification(null);
@@ -58,6 +51,9 @@ export const useEditor = () => {
             setWorkspace(newWorkspace);
             setStructuredTree(buildFileTree(data.tree, repo));
             setSidebarMode('files');
+            setOpenFiles([]);
+            setActiveFilePath(null);
+            setStagedFiles(new Set());
         } catch (error) {
             setNotification({ message: (error as Error).message, type: 'error' });
         } finally {
@@ -66,9 +62,9 @@ export const useEditor = () => {
     }, [token]);
 
     const handleFileSelect = useCallback(async (path: string) => {
-        const existingFile = openFiles.find(f => f.path.toLowerCase() === path.toLowerCase());
+        const existingFile = openFiles.find(f => f.path === path);
         if (existingFile) {
-            setActiveFilePath(existingFile.path);
+            setActiveFilePath(path);
             return;
         }
         if (!workspace) return;
@@ -91,7 +87,11 @@ export const useEditor = () => {
 
     const handleCloseFile = (path: string) => {
         setOpenFiles(files => files.filter(f => f.path !== path));
-        setStagedFiles(prev => { const next = new Set(prev); next.delete(path); return next; });
+        setStagedFiles(prev => {
+            const next = new Set(prev);
+            next.delete(path);
+            return next;
+        });
         if (activeFilePath === path) {
             const remaining = openFiles.filter(f => f.path !== path);
             setActiveFilePath(remaining.length > 0 ? remaining[remaining.length - 1].path : null);
@@ -101,9 +101,9 @@ export const useEditor = () => {
     const handleSave = () => {
         if (!activeFilePath) return;
         const currentFile = openFiles.find(f => f.path === activeFilePath);
-        if (currentFile) {
+        if (currentFile && currentFile.content !== currentFile.originalContent) {
              setOpenFiles(files => files.map(f => 
-                f.path === activeFilePath ? { ...f, originalContent: f.content } : f
+                f.path === activeFilePath ? { ...f, originalContent: f.content, isNew: false } : f
             ));
             setStagedFiles(prev => new Set(prev).add(activeFilePath));
             setNotification({ message: `${activeFilePath.split('/').pop()} saved locally.`, type: 'success' });
@@ -116,18 +116,13 @@ export const useEditor = () => {
         try {
             const filesToCommit = openFiles
                 .filter(f => stagedFiles.has(f.path))
-                .map(f => ({ path: f.path, content: f.content, isNew: f.isNew }));
+                .map(f => ({ path: f.path, content: f.content }));
             
-            const payload = filesToCommit.map(f => ({
-                path: f.path,
-                content: f.content
-            }));
-            
-            await editorApi.commitFiles(`${workspace.owner}/${workspace.repo}`, workspace.branch, token, payload, commitMessage);
+            await editorApi.commitFiles(`${workspace.owner}/${workspace.repo}`, workspace.branch, token, filesToCommit, commitMessage);
             
             setOpenFiles(prevFiles => prevFiles.map(pf => {
                 if (stagedFiles.has(pf.path)) {
-                    return { ...pf, originalContent: pf.content, isNew: false };
+                    return { ...pf, originalContent: pf.content };
                 }
                 return pf;
             }));
@@ -141,54 +136,11 @@ export const useEditor = () => {
         }
     }, [workspace, token, openFiles, stagedFiles]);
 
-    const handleCreateNode = (path: string, type: 'file' | 'folder') => {
-        if (!workspace) return;
-        const name = prompt(`Enter name for new ${type}:`);
-        if (!name) return;
-
-        const newPath = path ? `${path}/${name}` : name;
-
-        if (type === 'folder') {
-            const placeholderPath = `${newPath}/.gitkeep`;
-            const newFile: ActiveFile = { path: placeholderPath, content: '', originalContent: '', isNew: true };
-            setOpenFiles(prev => [...prev, newFile]);
-            setActiveFilePath(placeholderPath);
-            updateWorkspaceTree([...workspace.tree, { path: placeholderPath, type: 'blob', sha: '', url: '' }]);
-            handleSave();
-            return;
-        }
-        
-        const newFile: ActiveFile = { path: newPath, content: '', originalContent: '', isNew: true };
-        setOpenFiles(prev => [...prev, newFile]);
-        setActiveFilePath(newPath);
-        updateWorkspaceTree([...workspace.tree, { path: newPath, type: 'blob', sha: '', url: '' }]);
-    };
-
-    const handleRenameNode = (oldPath: string) => {
-        setNotification({ message: 'Rename is not yet implemented.', type: 'error'});
-    };
-
-    const handleDeleteNode = (path: string) => {
-         if (!workspace || !confirm(`Delete ${path}? This requires a direct commit.`)) return;
-         setIsLoading(true);
-         editorApi.commitFiles(
-             `${workspace.owner}/${workspace.repo}`, workspace.branch, token,
-             [{ path, content: null }],
-             `chore: delete ${path}`
-         ).then(() => {
-             setNotification({ message: `${path} deleted.`, type: 'success' });
-             updateWorkspaceTree(workspace.tree.filter(f => !f.path.startsWith(path)));
-             handleCloseFile(path);
-         }).catch(err => setNotification({ message: (err as Error).message, type: 'error' }))
-         .finally(() => setIsLoading(false));
-    };
-
     const activeFile = openFiles.find(f => f.path === activeFilePath);
 
     return {
         token, setToken, workspace, structuredTree, openFiles, activeFile, stagedFiles, sidebarMode, setSidebarMode,
         isLoading, isOpeningFile, notification, setNotification,
-        handleCloneRepo, handleFileSelect, handleContentChange, handleCloseFile, handleSave, handleCommit, setActiveFilePath,
-        handleCreateNode, handleRenameNode, handleDeleteNode
+        handleCloneRepo, handleFileSelect, handleContentChange, handleCloseFile, handleSave, handleCommit, setActiveFilePath
     };
 };
