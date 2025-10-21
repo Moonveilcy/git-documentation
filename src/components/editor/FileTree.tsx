@@ -1,44 +1,26 @@
-import { useState, useRef, useEffect, Fragment } from 'react';
+import { useRef, useEffect, Fragment } from 'react';
 import { File, Folder, ChevronRight, ChevronDown, MoreVertical } from 'lucide-react';
 import { useEditor } from '../../hooks/useEditor';
 
 const ActionMenu = () => null; 
 
 const TreeNode = ({ name, node, editor, path = '' }: { name: string, node: any, editor: ReturnType<typeof useEditor>, path?: string }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const menuRef = useRef(null);
     const isRoot = path === '';
     const currentPath = isRoot ? name : (path ? `${path}/${name}` : name);
     const isLeaf = node.__isLeaf;
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !(menuRef.current as any).contains(event.target)) {
-                setIsMenuOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [menuRef]);
+    const isOpen = editor.expandedFolders.has(currentPath);
 
     return (
         <li className="group relative">
             <div className={`w-full flex items-center justify-between pr-2 text-sm hover:bg-purple-100 ${isRoot ? 'font-bold' : ''}`}>
                 <button
-                    onClick={() => isLeaf ? editor.handleFileSelect(node.__itemData.path) : setIsOpen(!isOpen)}
+                    onClick={() => isLeaf ? editor.handleFileSelect(node.__itemData.path) : editor.toggleFolder(currentPath)}
                     className="flex-grow flex items-center gap-2 pl-4 py-1.5 truncate text-left"
                 >
-                    {!isRoot && !isLeaf && (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+                    {!isLeaf && (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                     {isLeaf ? <File size={14} className="flex-shrink-0 text-gray-500 ml-5" /> : <Folder size={14} className="flex-shrink-0 text-yellow-600" />}
                     <span>{name}</span>
                 </button>
-                <div ref={menuRef}>
-                    <button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(p => !p); }} className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-300">
-                         <MoreVertical size={16} />
-                    </button>
-                    <ActionMenu />
-                </div>
             </div>
             {!isLeaf && isOpen && (
                 <ul className="pl-4 border-l border-gray-200">

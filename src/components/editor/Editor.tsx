@@ -33,13 +33,18 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
     onContentChangeRef.current = onContentChange;
     
     useEffect(() => {
+        let isDisposed = false;
         const monaco = (window as any).monaco;
         if (containerRef.current) {
             if (!monaco) {
+                if (document.getElementById('monaco-loader-script')) return;
+
                 const script = document.createElement('script');
+                script.id = 'monaco-loader-script';
                 script.src = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs/loader.js';
                 document.body.appendChild(script);
                 script.onload = () => {
+                    if (isDisposed) return;
                     const require = (window as any).require;
                     require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs' }});
                     require(['vs/editor/editor.main'], (monacoInstance: any) => {
@@ -52,6 +57,7 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
             }
         }
         return () => {
+            isDisposed = true;
             editorRef.current?.dispose();
             editorRef.current = null;
         };
@@ -62,7 +68,10 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
             const model = editorRef.current.getModel();
             if (activeFile && model) {
                 if (activeFile.content !== model.getValue()) {
-                    model.setValue(activeFile.content);
+                    editorRef.current.executeEdits(null, [{
+                        range: model.getFullModelRange(),
+                        text: activeFile.content
+                    }]);
                 }
                 const language = getLanguageFromPath(activeFile.path);
                 (window as any).monaco.editor.setModelLanguage(model, language);
@@ -74,14 +83,6 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
 
     const initializeMonaco = (monaco: any) => {
         if (containerRef.current && !editorRef.current) {
-            monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-                noSemanticValidation: false,
-                noSyntaxValidation: false,
-            });
-            monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
-                target: monaco.languages.typescript.ScriptTarget.ESNext,
-                allowNonTsExtensions: true,
-            });
             editorRef.current = monaco.editor.create(containerRef.current, {
                 value: '',
                 language: 'plaintext',

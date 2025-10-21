@@ -8,9 +8,7 @@ const buildFileTree = (paths: RepoTreeItem[], repoName: string) => {
     paths.forEach(item => {
         let current = root[repoName];
         item.path.split('/').forEach((part, index, arr) => {
-            if (!current[part]) {
-                current[part] = {};
-            }
+            if (!current[part]) current[part] = {};
             current = current[part];
             if (index === arr.length - 1) {
                 current.__isLeaf = true;
@@ -32,12 +30,25 @@ export const useEditor = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isOpeningFile, setIsOpeningFile] = useState<string | null>(null);
     const [notification, setNotification] = useState<NotificationType | null>(null);
+    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         const storedToken = localStorage.getItem('githubToken');
         if (storedToken) setToken(storedToken);
     }, []);
 
+    const toggleFolder = (path: string) => {
+        setExpandedFolders(prev => {
+            const next = new Set(prev);
+            if (next.has(path)) {
+                next.delete(path);
+            } else {
+                next.add(path);
+            }
+            return next;
+        });
+    };
+    
     const handleCloneRepo = useCallback(async (repoPath: string, branchName: string) => {
         setIsLoading(true);
         setNotification(null);
@@ -46,6 +57,7 @@ export const useEditor = () => {
         setOpenFiles([]);
         setActiveFilePath(null);
         setStagedFiles(new Set());
+        setExpandedFolders(new Set());
 
         try {
             const data = await editorApi.scanRepoTree(repoPath, branchName, token);
@@ -57,11 +69,13 @@ export const useEditor = () => {
                 owner, repo, branch: branchName, isCloned: true, tree: data.tree
             };
             setWorkspace(newWorkspace);
-            setStructuredTree(buildFileTree(data.tree, repo));
+            const tree = buildFileTree(data.tree, repo);
+            setStructuredTree(tree);
+            setExpandedFolders(new Set([repo]));
             setSidebarMode('files');
         } catch (error) {
             setNotification({ message: (error as Error).message, type: 'error' });
-            setWorkspace(null); 
+            setWorkspace(null);
         } finally {
             setIsLoading(false);
         }
@@ -132,7 +146,6 @@ export const useEditor = () => {
                 }
                 return pf;
             }));
-
             setStagedFiles(new Set());
             setNotification({ message: `${filesToCommit.length} file(s) committed successfully!`, type: 'success' });
         } catch (error) {
@@ -146,7 +159,7 @@ export const useEditor = () => {
 
     return {
         token, setToken, workspace, structuredTree, openFiles, activeFile, stagedFiles, sidebarMode, setSidebarMode,
-        isLoading, isOpeningFile, notification, setNotification,
-        handleCloneRepo, handleFileSelect, handleContentChange, handleCloseFile, handleSave, handleCommit, setActiveFilePath
+        isLoading, isOpeningFile, notification, setNotification, expandedFolders,
+        handleCloneRepo, handleFileSelect, handleContentChange, handleCloseFile, handleSave, handleCommit, setActiveFilePath, toggleFolder
     };
 };
