@@ -2,7 +2,6 @@ import { useRef, useEffect, useState } from 'react';
 import { editor as MonacoEditor, Uri } from 'monaco-editor';
 import { ActiveFile } from '../../types/editor';
 
-// Fungsi untuk menentukan bahasa berdasarkan ekstensi file
 const getLanguageFromPath = (path: string): string => {
     const extension = path.split('.').pop()?.toLowerCase();
     switch (extension) {
@@ -32,15 +31,12 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
     const containerRef = useRef<HTMLDivElement>(null);
     const [isEditorReady, setIsEditorReady] = useState(false);
 
-    // Menggunakan ref untuk callback agar tidak memicu useEffect yang tidak perlu
     const onContentChangeRef = useRef(onContentChange);
     onContentChangeRef.current = onContentChange;
     
-    // Menggunakan ref untuk activeFile agar bisa diakses di dalam listener
     const activeFileRef = useRef(activeFile);
     activeFileRef.current = activeFile;
 
-    // useEffect untuk inisialisasi Monaco Editor (hanya berjalan sekali)
     useEffect(() => {
         let isDisposed = false;
         const monaco = (window as any).monaco;
@@ -56,28 +52,24 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
                     minimap: { enabled: false },
                 });
 
-                // Menambahkan listener untuk perubahan konten
                 editorRef.current.onDidChangeModelContent(() => {
                     const currentFile = activeFileRef.current;
                     const model = editorRef.current?.getModel();
                     const currentValue = model?.getValue();
 
                     if (currentFile && model && currentValue !== currentFile.content) {
-                        // Pastikan URI model cocok dengan file yang aktif
                         if (model.uri.path === `/${currentFile.path}`) {
                            onContentChangeRef.current(currentFile.path, currentValue || '');
                         }
                     }
                 });
                 
-                // Tandai bahwa editor sudah siap
                 setIsEditorReady(true);
             }
         };
 
         if (containerRef.current) {
             if (!monaco) {
-                // Jika script monaco belum ada, tambahkan ke body
                 if (document.getElementById('monaco-loader-script')) return;
                 const script = document.createElement('script');
                 script.id = 'monaco-loader-script';
@@ -102,39 +94,32 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
         return () => {
             isDisposed = true;
             editorRef.current?.dispose();
-            // Membersihkan semua model yang sudah dibuat untuk mencegah memory leak
             (window as any).monaco?.editor.getModels().forEach((model: any) => model.dispose());
             editorRef.current = null;
         };
     }, []);
 
-    // useEffect untuk sinkronisasi file yang aktif dengan model di Monaco Editor
     useEffect(() => {
         const monaco = (window as any).monaco;
         if (!isEditorReady || !editorRef.current || !monaco) return;
 
         if (activeFile) {
-            // Menggunakan URI untuk identifikasi unik setiap file
-            const modelUri = monaco.Uri.parse(activeFile.path);
+            const modelUri = monaco.Uri.file(activeFile.path);
             let model = monaco.editor.getModel(modelUri);
 
             if (!model) {
-                // Jika model belum ada, buat model baru
                 const language = getLanguageFromPath(activeFile.path);
                 model = monaco.editor.createModel(activeFile.content, language, modelUri);
             } else {
-                // Jika model sudah ada dan kontennya berbeda, update nilainya
                 if (model.getValue() !== activeFile.content) {
                     model.setValue(activeFile.content);
                 }
             }
             
-            // Atur editor untuk menggunakan model yang sesuai
             if (editorRef.current.getModel() !== model) {
                 editorRef.current.setModel(model);
             }
         } else {
-            // Jika tidak ada file yang aktif, hapus model dari editor
             editorRef.current.setModel(null);
         }
 
