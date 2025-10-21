@@ -1,6 +1,7 @@
-import { Folder, GitCommit, SidebarMode, useEditor } from '../../types/editor';
+import { SidebarMode, useEditor } from '../../types/editor';
 import { FileExplorer } from './FileExplorer';
 import { SourceControl } from './SourceControl';
+import { Folder, GitCommit } from 'lucide-react';
 
 interface SidebarProps {
     editor: ReturnType<typeof useEditor>;
