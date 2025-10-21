@@ -4,11 +4,13 @@ import { NotificationType } from './useGithub';
 import { RepoTreeItem, ActiveFile, Workspace, SidebarMode } from '../types/editor';
 
 const buildFileTree = (paths: RepoTreeItem[], repoName: string) => {
-    const root = { [repoName]: {} };
+    const root: any = { [repoName]: {} };
     paths.forEach(item => {
         let current = root[repoName];
         item.path.split('/').forEach((part, index, arr) => {
-            if (!current[part]) current[part] = {};
+            if (!current[part]) {
+                current[part] = {};
+            }
             current = current[part];
             if (index === arr.length - 1) {
                 current.__isLeaf = true;
@@ -39,10 +41,16 @@ export const useEditor = () => {
     const handleCloneRepo = useCallback(async (repoPath: string, branchName: string) => {
         setIsLoading(true);
         setNotification(null);
+        setWorkspace(null);
+        setStructuredTree({});
+        setOpenFiles([]);
+        setActiveFilePath(null);
+        setStagedFiles(new Set());
+
         try {
             const data = await editorApi.scanRepoTree(repoPath, branchName, token);
             if (!data || !data.tree) {
-                throw new Error("Repository not found or it's empty.");
+                throw new Error("Repository not found, is empty, or token is invalid.");
             }
             const [owner, repo] = repoPath.split('/');
             const newWorkspace: Workspace = {
@@ -51,11 +59,9 @@ export const useEditor = () => {
             setWorkspace(newWorkspace);
             setStructuredTree(buildFileTree(data.tree, repo));
             setSidebarMode('files');
-            setOpenFiles([]);
-            setActiveFilePath(null);
-            setStagedFiles(new Set());
         } catch (error) {
             setNotification({ message: (error as Error).message, type: 'error' });
+            setWorkspace(null); 
         } finally {
             setIsLoading(false);
         }
