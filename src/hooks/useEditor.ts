@@ -94,9 +94,9 @@ export const useEditor = () => {
         }
     }, [workspace, token, openFiles]);
     
-    const handleContentChange = (path: string, newContent: string) => {
+    const handleContentChange = useCallback((path: string, newContent: string) => {
         setOpenFiles(files => files.map(f => f.path === path ? { ...f, content: newContent } : f));
-    };
+    }, []);
 
     const handleCloseFile = (path: string) => {
         setOpenFiles(files => files.filter(f => f.path !== path));

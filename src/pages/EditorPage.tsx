@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useCallback } from 'react';
 import { useEditor } from '../hooks/useEditor';
 import { Editor } from '../components/editor/Editor';
 import { EditorTabs } from '../components/editor/EditorTabs';
@@ -16,6 +16,12 @@ export default function EditorPage() {
 
     const activeFile = editor.activeFile;
     const isModified = activeFile ? activeFile.content !== activeFile.originalContent : false;
+
+    const onContentChange = useCallback((content: string) => {
+        if (activeFile) {
+            editor.handleContentChange(activeFile.path, content);
+        }
+    }, [activeFile, editor.handleContentChange]);
 
     return (
         <div className="h-screen w-screen bg-gray-800 flex overflow-hidden">
@@ -73,17 +79,11 @@ export default function EditorPage() {
                         onTabClose={editor.handleCloseFile}
                     />
                     <div className="flex-grow relative">
-                        {activeFile ? (
-                            <Editor 
-                                activeFile={activeFile}
-                                onContentChange={(newContent) => editor.handleContentChange(activeFile.path, newContent)}
-                                isLoading={editor.isLoading}
-                            />
-                        ) : (
-                            <div className="flex items-center justify-center h-full bg-gray-800 text-white p-4 text-center">
-                               <p>Welcome to GitMoon Editor!<br/>Clone a repository from the Git tab to get started.</p>
-                            </div>
-                        )}
+                        <Editor 
+                            activeFile={activeFile}
+                            onContentChange={onContentChange}
+                            isOpeningFile={editor.isOpeningFile}
+                        />
                     </div>
                 </main>
             </div>
