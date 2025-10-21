@@ -38,7 +38,6 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
         if (containerRef.current) {
             if (!monaco) {
                 if (document.getElementById('monaco-loader-script')) return;
-
                 const script = document.createElement('script');
                 script.id = 'monaco-loader-script';
                 script.src = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs/loader.js';
@@ -64,19 +63,14 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
     }, []);
 
     useEffect(() => {
-        if (editorRef.current) {
+        if (editorRef.current && activeFile) {
             const model = editorRef.current.getModel();
-            if (activeFile && model) {
-                if (activeFile.content !== model.getValue()) {
-                    editorRef.current.executeEdits(null, [{
-                        range: model.getFullModelRange(),
-                        text: activeFile.content
-                    }]);
-                }
-                const language = getLanguageFromPath(activeFile.path);
+            if (model && activeFile.content !== model.getValue()) {
+                model.setValue(activeFile.content);
+            }
+            if (model) {
+                 const language = getLanguageFromPath(activeFile.path);
                 (window as any).monaco.editor.setModelLanguage(model, language);
-            } else if (!activeFile && model) {
-                model.setValue('');
             }
         }
     }, [activeFile]);
@@ -92,8 +86,9 @@ export const Editor = ({ activeFile, onContentChange, isOpeningFile }: EditorPro
                 minimap: { enabled: false },
             });
             editorRef.current.onDidChangeModelContent(() => {
-                if (activeFile && editorRef.current) {
-                    onContentChangeRef.current(activeFile.path, editorRef.current.getValue());
+                const currentValue = editorRef.current?.getValue();
+                if (activeFile && currentValue !== activeFile.content) {
+                    onContentChangeRef.current(activeFile.path, currentValue || '');
                 }
             });
         }

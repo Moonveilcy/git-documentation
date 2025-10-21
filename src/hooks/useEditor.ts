@@ -9,22 +9,16 @@ const buildFileTree = (paths: RepoTreeItem[], repoName: string) => {
         let current = root[repoName];
         const parts = item.path.split('/');
         parts.forEach((part, index) => {
-            if (!current[part]) {
-                current[part] = {};
-            }
+            if (!current[part]) current[part] = {};
             current = current[part];
-
-            if (index === parts.length - 1) {
-                if (item.type === 'blob') {
-                    current.__isLeaf = true;
-                    current.__itemData = item;
-                }
+            if (index === parts.length - 1 && item.type === 'blob') {
+                current.__isLeaf = true;
+                current.__itemData = item;
             }
         });
     });
     return root;
 };
-
 
 export const useEditor = () => {
     const [token, setToken] = useState('');
@@ -47,11 +41,7 @@ export const useEditor = () => {
     const toggleFolder = (path: string) => {
         setExpandedFolders(prev => {
             const next = new Set(prev);
-            if (next.has(path)) {
-                next.delete(path);
-            } else {
-                next.add(path);
-            }
+            next.has(path) ? next.delete(path) : next.add(path);
             return next;
         });
     };
@@ -68,13 +58,10 @@ export const useEditor = () => {
 
         try {
             const data = await editorApi.scanRepoTree(repoPath, branchName, token);
-            if (!data || !data.tree) {
-                throw new Error("Repository not found, is empty, or token is invalid.");
-            }
+            if (!data || !data.tree) throw new Error("Repo not found or is empty.");
+            
             const [owner, repo] = repoPath.split('/');
-            const newWorkspace: Workspace = {
-                owner, repo, branch: branchName, isCloned: true, tree: data.tree
-            };
+            const newWorkspace: Workspace = { owner, repo, branch: branchName, isCloned: true, tree: data.tree };
             setWorkspace(newWorkspace);
             const tree = buildFileTree(data.tree, repo);
             setStructuredTree(tree);
@@ -89,8 +76,7 @@ export const useEditor = () => {
     }, [token]);
 
     const handleFileSelect = useCallback(async (path: string) => {
-        const existingFile = openFiles.find(f => f.path === path);
-        if (existingFile) {
+        if (openFiles.some(f => f.path === path)) {
             setActiveFilePath(path);
             return;
         }
@@ -147,26 +133,32 @@ export const useEditor = () => {
             
             await editorApi.commitFiles(`${workspace.owner}/${workspace.repo}`, workspace.branch, token, filesToCommit, commitMessage);
             
-            setOpenFiles(prevFiles => prevFiles.map(pf => {
-                if (stagedFiles.has(pf.path)) {
-                    return { ...pf, originalContent: pf.content };
-                }
-                return pf;
-            }));
+            setOpenFiles(prev => prev.map(f => stagedFiles.has(f.path) ? { ...f, originalContent: f.content } : f));
             setStagedFiles(new Set());
-            setNotification({ message: `${filesToCommit.length} file(s) committed successfully!`, type: 'success' });
+            setNotification({ message: `${filesToCommit.length} file(s) committed.`, type: 'success' });
         } catch (error) {
             setNotification({ message: (error as Error).message, type: 'error' });
         } finally {
             setIsLoading(false);
         }
     }, [workspace, token, openFiles, stagedFiles]);
+    
+    const handleCreateNode = (path: string, type: 'file' | 'folder') => {
+        setNotification({ message: `Create ${type} is not yet implemented.`, type: 'error' });
+    };
+    const handleRenameNode = (path: string) => {
+        setNotification({ message: `Rename is not yet implemented.`, type: 'error' });
+    };
+    const handleDeleteNode = (path: string) => {
+        setNotification({ message: `Delete is not yet implemented.`, type: 'error' });
+    };
 
     const activeFile = openFiles.find(f => f.path === activeFilePath);
 
     return {
         token, setToken, workspace, structuredTree, openFiles, activeFile, stagedFiles, sidebarMode, setSidebarMode,
         isLoading, isOpeningFile, notification, setNotification, expandedFolders,
-        handleCloneRepo, handleFileSelect, handleContentChange, handleCloseFile, handleSave, handleCommit, setActiveFilePath, toggleFolder
+        handleCloneRepo, handleFileSelect, handleContentChange, handleCloseFile, handleSave, handleCommit, setActiveFilePath, toggleFolder,
+        handleCreateNode, handleRenameNode, handleDeleteNode
     };
 };
