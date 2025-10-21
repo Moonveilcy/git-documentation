@@ -1,38 +1,35 @@
 import { useState } from 'react';
-import { UnapologeticButton } from '../commit/Shared';
 import { useEditor } from '../../hooks/useEditor';
-
-const parseRepoInput = (input: string): string => {
-    try {
-        if (input.startsWith('http')) {
-            const url = new URL(input);
-            const pathParts = url.pathname.split('/').filter(part => part);
-            if (pathParts.length >= 2) {
-                return `${pathParts[0]}/${pathParts[1]}`;
-            }
-        }
-    } catch (e) { /* Invalid URL, treat as path */ }
-    return input.trim();
-};
 
 interface SourceControlProps {
     editor: ReturnType<typeof useEditor>;
 }
 
+const parseRepoUrl = (url: string) => {
+    try {
+        if (!url.startsWith('http')) return url;
+        const path = new URL(url).pathname;
+        return path.substring(1).split('/').slice(0, 2).join('/');
+    } catch {
+        return url;
+    }
+};
+
 export const SourceControl = ({ editor }: SourceControlProps) => {
-    const [repoInput, setRepoInput] = useState('Gaeuly/veilcy-cloner');
-    const [branchToClone, setBranchToClone] = useState('main');
+    // FIX: Hapus nilai default 'Gaeuly/veilcy-cloner'
+    const [repoInput, setRepoInput] = useState(''); 
+    const [branchInput, setBranchInput] = useState('main');
     const [commitMessage, setCommitMessage] = useState('');
 
     const handleClone = () => {
-        const repoPath = parseRepoInput(repoInput);
-        if (!repoPath.includes('/')) {
-            editor.setNotification({ message: 'Invalid repository format. Use URL or username/repo.', type: 'error' });
-            return;
+        const parsedRepo = parseRepoUrl(repoInput);
+        if (parsedRepo) {
+            editor.handleCloneRepo(parsedRepo, branchInput);
+        } else {
+            editor.setNotification({ message: 'Invalid repository URL or format.', type: 'error' });
         }
-        editor.handleCloneRepo(repoPath, branchToClone);
     };
-
+    
     const handleCommit = () => {
         if (!commitMessage.trim()) {
             editor.setNotification({ message: 'Commit message cannot be empty.', type: 'error' });
@@ -43,37 +40,61 @@ export const SourceControl = ({ editor }: SourceControlProps) => {
     };
 
     return (
-        <div className="p-4 space-y-6">
-            <div>
-                <h3 className="font-bold mb-2">Clone Repository</h3>
-                <div className="space-y-2">
-                    <input type="text" placeholder="URL or username/repo" value={repoInput} onChange={e => setRepoInput(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
-                    <input type="text" placeholder="branch" value={branchToClone} onChange={e => setBranchToClone(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
-                    <UnapologeticButton onClick={handleClone} disabled={editor.isLoading} variant="secondary">
-                        {editor.isLoading ? 'Cloning...' : 'Clone'}
-                    </UnapologeticButton>
-                </div>
-            </div>
-
-            {editor.workspace && (
-                <div>
-                    <h3 className="font-bold mb-2">Commit Changes</h3>
-                    <p className="text-sm text-gray-600 mb-2">{editor.stagedFiles.size} staged changes.</p>
-                    <textarea
-                        placeholder="Commit message"
-                        value={commitMessage}
-                        onChange={e => setCommitMessage(e.target.value)}
-                        className="w-full p-2 border-2 border-black rounded-md bg-white min-h-[60px]"
+        <div className="p-4 h-full flex flex-col bg-gray-50">
+            <h3 className="text-lg font-bold mb-4">Source Control</h3>
+            
+            {!editor.workspace?.isCloned ? (
+                 <div className="space-y-3">
+                    <h4 className="font-semibold">Clone Repository</h4>
+                    <input
+                        type="text"
+                        placeholder="URL or user/repo"
+                        value={repoInput}
+                        onChange={(e) => setRepoInput(e.target.value)}
+                        className="w-full p-2 border rounded"
                     />
-                    <UnapologeticButton onClick={handleCommit} disabled={editor.isLoading || editor.stagedFiles.size === 0} variant="primary" className="mt-2">
-                        {editor.isLoading ? 'Committing...' : `Commit ${editor.stagedFiles.size} file(s)`}
-                    </UnapologeticButton>
+                    <input
+                        type="text"
+                        value={branchInput}
+                        onChange={(e) => setBranchInput(e.target.value)}
+                        className="w-full p-2 border rounded"
+                    />
+                    <button onClick={handleClone} disabled={editor.isLoading} className="w-full p-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-purple-300">
+                        {editor.isLoading ? 'Cloning...' : 'Clone'}
+                    </button>
+                </div>
+            ) : (
+                <div className="flex-grow flex flex-col justify-between">
+                    <div>
+                        <h4 className="font-semibold">Commit Changes</h4>
+                        <p className="text-sm text-gray-500 mb-2">
+                           {editor.stagedFiles.size} file(s) ready to commit.
+                        </p>
+                        <textarea
+                            placeholder="Commit message"
+                            value={commitMessage}
+                            onChange={(e) => setCommitMessage(e.target.value)}
+                            className="w-full p-2 border rounded h-24"
+                            disabled={editor.stagedFiles.size === 0}
+                        />
+                    </div>
+                    <button onClick={handleCommit} disabled={editor.isLoading || editor.stagedFiles.size === 0} className="w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300">
+                         {editor.isLoading ? 'Committing...' : `Commit ${editor.stagedFiles.size} File(s)`}
+                    </button>
                 </div>
             )}
-             <div>
-                <h3 className="font-bold mb-2">Configuration</h3>
-                 <input type="password" placeholder="GitHub Token" value={editor.token} onChange={(e) => editor.setToken(e.target.value)} className="w-full p-2 border-2 border-black rounded-md bg-white"/>
-            </div>
+             <div className="mt-4 pt-4 border-t">
+                 <h4 className="font-semibold">Configuration</h4>
+                 <input
+                    type="password"
+                    placeholder="GitHub Token"
+                    value={editor.token}
+                    onChange={(e) => editor.setToken(e.target.value)}
+                    className="w-full p-2 border rounded mt-2"
+                />
+             </div>
         </div>
     );
 };
+
+
