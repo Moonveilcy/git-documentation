@@ -66,9 +66,11 @@ const updateBranchRef = (repo: string, branch: string, commitSha: string, token:
         body: JSON.stringify({ sha: commitSha }),
     });
 
-
+// --- PERBAIKAN DI SINI ---
+// Fungsi getScope() dan variabel scope telah dihapus seluruhnya.
 const createIndividualCommitMessage = (file: RepoFile): string => {
     const description = file.commitMessage || `update ${file.name}`;
+    // Format pesan commit sekarang TIDAK menyertakan (scope)
     return `${file.commitType}: ${description}`;
 };
 
