@@ -66,12 +66,9 @@ const updateBranchRef = (repo: string, branch: string, commitSha: string, token:
         body: JSON.stringify({ sha: commitSha }),
     });
 
-// --- PERUBAHAN DI SINI ---
-// Fungsi ini sekarang BANYAK lebih sederhana
+
 const createIndividualCommitMessage = (file: RepoFile): string => {
-    // Fungsi getScope dan variabel scope telah dihapus.
     const description = file.commitMessage || `update ${file.name}`;
-    // Format pesan commit sekarang tidak lagi menyertakan (scope)
     return `${file.commitType}: ${description}`;
 };
 
@@ -88,7 +85,7 @@ export const commitMultipleFiles = async (
         const tree = [{ path: file.path, mode: '100644', type: 'blob', sha: blobSha }];
 
         const newTreeSha = await createTree(repo, baseTreeSha, tree, cleanToken);
-        const commitMessage = createIndividualCommitMessage(file); // Ini sekarang akan memanggil fungsi yang sudah diubah
+        const commitMessage = createIndividualCommitMessage(file);
         const newCommitSha = await createCommit(repo, commitMessage, newTreeSha, parentCommitSha, cleanToken);
         
         parentCommitSha = newCommitSha;
