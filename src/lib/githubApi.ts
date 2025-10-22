@@ -66,14 +66,13 @@ const updateBranchRef = (repo: string, branch: string, commitSha: string, token:
         body: JSON.stringify({ sha: commitSha }),
     });
 
+// --- PERUBAHAN DI SINI ---
+// Fungsi ini sekarang BANYAK lebih sederhana
 const createIndividualCommitMessage = (file: RepoFile): string => {
-    const getScope = (path: string): string => {
-        const pathParts = path.split('/').filter(p => p && !p.includes('.'));
-        return pathParts.length > 0 ? pathParts.pop()! : path.split('.')[0] || 'general';
-    };
-    const scope = getScope(file.path);
+    // Fungsi getScope dan variabel scope telah dihapus.
     const description = file.commitMessage || `update ${file.name}`;
-    return `${file.commitType}(${scope}): ${description}`;
+    // Format pesan commit sekarang tidak lagi menyertakan (scope)
+    return `${file.commitType}: ${description}`;
 };
 
 export const commitMultipleFiles = async (
@@ -89,7 +88,7 @@ export const commitMultipleFiles = async (
         const tree = [{ path: file.path, mode: '100644', type: 'blob', sha: blobSha }];
 
         const newTreeSha = await createTree(repo, baseTreeSha, tree, cleanToken);
-        const commitMessage = createIndividualCommitMessage(file);
+        const commitMessage = createIndividualCommitMessage(file); // Ini sekarang akan memanggil fungsi yang sudah diubah
         const newCommitSha = await createCommit(repo, commitMessage, newTreeSha, parentCommitSha, cleanToken);
         
         parentCommitSha = newCommitSha;
@@ -128,7 +127,8 @@ export const deletePaths = async (
     }));
     
     const newTreeSha = await createTree(repo, baseTreeSha, tree, cleanToken);
-    const commitMessage = `chore(cleanup): remove ${isFolder ? 'folder' : 'file'} ${pathToDelete}`;
+    
+    const commitMessage = `chore: remove ${isFolder ? 'folder' : 'file'} ${pathToDelete}`;
     const newCommitSha = await createCommit(repo, commitMessage, newTreeSha, parentCommitSha, cleanToken);
     
     await updateBranchRef(repo, branch, newCommitSha, cleanToken);
